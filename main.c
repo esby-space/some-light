@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <raylib.h>
@@ -23,12 +24,13 @@ const u32 MAX_LENGTH = 256;
 const u32 WIDTH = 1200;
 const u32 HEIGHT = 800;
 
-const u32 LINE_LENGTH = 1024;
-const u32 NUM_POINT_LIGHT_RAYS = 32;
+const u32 LINE_LENGTH = 4096;
+const u32 NUM_POINT_SOURCE_RAYS = 32;
+const u32 LINE_SOURCE_RAY_DISTANCE = 32;
 
 typedef struct {
     Vector2 start;
-    float theta;
+    f32 theta;
 } LightRay;
 
 typedef struct {
@@ -48,19 +50,52 @@ int main() {
         .capacity = MAX_LENGTH
     };
 
+    bool drawing_line_source = false;
+    Vector2 line_source_start;
+
     while (!WindowShouldClose()) {
-        float dt = GetFrameTime();
+        f32 dt = GetFrameTime();
 
         // Add point source
         if (IsKeyPressed(KEY_ONE)) {
-            printf("creating point light\n");
-            for (int i = 0; i < NUM_POINT_LIGHT_RAYS; i++) {
+            printf("creating point source\n");
+            for (int i = 0; i < NUM_POINT_SOURCE_RAYS; i++) {
                 rays.items[rays.length] = (LightRay) {
                     .start = GetMousePosition(),
-                    .theta = 2 * PI * i / NUM_POINT_LIGHT_RAYS
+                    .theta = 2 * PI * i / NUM_POINT_SOURCE_RAYS
                 };
                 rays.length++;
             }
+        }
+
+        // Add line source
+        if (IsKeyPressed(KEY_TWO)) {
+            if (!drawing_line_source) {
+                printf("starting line source\n");
+                line_source_start = GetMousePosition();
+            } else {
+                printf("creating line source\n");
+                Vector2 start = line_source_start;
+                Vector2 end = GetMousePosition();
+
+                f32 distance = sqrt(pow(end.y - start.y, 2) + pow(end.x - start.x, 2));
+                u32 num_rays = (u32) (distance / LINE_SOURCE_RAY_DISTANCE);
+                f32 theta = atan2(end.y - start.y, end.x - start.x) - PI / 2;
+
+                for (int i = 0; i <= num_rays; i++) {
+                    f32 scalar = (float) i / num_rays;
+                    rays.items[rays.length]= (LightRay) {
+                        .start = (Vector2) {
+                            .x = start.x + scalar * (end.x - start.x),
+                            .y = start.y + scalar * (end.y - start.y)
+                        },
+                        .theta = theta
+                    };
+                    rays.length++;
+                }
+            }
+
+            drawing_line_source = !drawing_line_source;
         }
 
         BeginDrawing();
