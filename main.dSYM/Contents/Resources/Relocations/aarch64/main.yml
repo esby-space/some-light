@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/esby/Documents/Code/physics/light-c/main'
+relocations:     []
+...
