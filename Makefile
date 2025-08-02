@@ -5,8 +5,8 @@ LIBS=$(shell pkg-config --libs --cflags raylib)
 all: main
 
 main: main.c
-	$(CC) main.c $(LIBS) $(FLAGS) -o out
+	$(CC) main.c $(LIBS) $(FLAGS) -o main
 
 clean:
-	rm ./out
+	rm ./main
 
