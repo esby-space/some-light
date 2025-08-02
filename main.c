@@ -75,13 +75,20 @@ typedef struct {
     u32 capacity;
 } Lines;
 
+Vector2 Vector2Add(Vector2* v, Vector2* w);
+Vector2 Vector2Subtract(Vector2* v, Vector2* w);
+Vector2 Vector2Scale(Vector2* v, f32 a);
+f32 Vector2Dot(Vector2* a, Vector2* b);
+f32 Vector2Cross(Vector2* a, Vector2* b);
+
+Vector2 lines_intersect(Line* line_1, Line* line_2);
+Vector2 ray_line_intersect(Ray* ray, Line* line);
+Vector2 rays_intersect(Ray* ray_1, Ray* ray_2);
+
 void add_point_source(Rays*);
 void add_line_source(Rays*, DrawState*);
 void add_mirror(Lines* mirrors, DrawState* state);
 void add_lens(Lines* mirrors, DrawState* state);
-
-bool line_intersects(Line* line_1, Line* line_2);
-bool intersects(Ray* Ray, Line* Line);
 
 int main() {
     InitWindow(WIDTH, HEIGHT, "esby is confused");
@@ -135,10 +142,10 @@ int main() {
             // TODO: implelement the important stuff
             Ray ray = light_rays.items[i];
             light_lines.items[light_lines.length] = (Line) {
-                .start = { .x = ray.start.x, .y = ray.start.y },
+                .start = { ray.start.x, ray.start.y },
                 .end = {
-                    .x = ray.start.x + LIGHT_RAY_LENGTH * cos(ray.theta),
-                    .y = ray.start.y + LIGHT_RAY_LENGTH * sin(ray.theta),
+                    ray.start.x + LIGHT_RAY_LENGTH * cos(ray.theta),
+                    ray.start.y + LIGHT_RAY_LENGTH * sin(ray.theta),
                 }
             };
 
@@ -179,6 +186,88 @@ int main() {
     return 0;
 }
 
+Vector2 Vector2Add(Vector2* v, Vector2* w) {
+    return (Vector2) { v->x + w->x, w->y + w->y };
+}
+
+Vector2 Vector2Subtract(Vector2* v, Vector2* w) {
+    return (Vector2) { v->x - w->x, w->y - w->y };
+}
+
+Vector2 Vector2Scale(Vector2* v, f32 a) {
+    return (Vector2) { a * v->x, a * v->y };
+}
+
+f32 Vector2Dot(Vector2* a, Vector2* b) {
+    return a->x * b->x + a->y * b->y;
+}
+
+f32 Vector2Cross(Vector2* a, Vector2* b) {
+    return a->x * b->y - a->y * b->x;
+}
+
+// line segment = a + bt where a = start, b = end - start, 0 < t < 1
+// t_1 = (a_2 - a_1) X b_2 / (b_1 X b_2), t_2 = (a_2 - a_1) X b_1 / (b_1 X b_2)
+Vector2 lines_intersect(Line* line_1, Line* line_2) {
+    Vector2 a_1 = line_1->start;
+    Vector2 a_2 = line_2->start;
+    Vector2 b_1 = Vector2Subtract(&line_1->end, &line_1->start);
+    Vector2 b_2 = Vector2Subtract(&line_2->end, &line_2->start);
+
+    Vector2 seperation = Vector2Subtract(&a_2, &a_1);
+    f32 denominator = Vector2Cross(&b_1, &b_2);
+    if (denominator == 0) return (Vector2) { NAN, NAN };
+
+    // intersection when 0 < t_1, t_2 < 1
+    f32 t_1 = Vector2Cross(&seperation, &b_2) / denominator;
+    f32 t_2 = Vector2Cross(&seperation, &b_1) / denominator;
+    if (t_1 > 0.0 && t_1 < 1.0 && t_2 > 0.0 && t_2 < 1.0) {
+        return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
+    }
+
+    return (Vector2) { NAN, NAN };
+}
+
+Vector2 ray_line_intersect(Ray* ray, Line* line) {
+    Vector2 a_1 = ray->start;
+    Vector2 a_2 = line->start;
+    Vector2 b_1 = (Vector2) { cos(ray->theta), sin(ray->theta) };
+    Vector2 b_2 = Vector2Subtract(&line->end, &line->start);
+
+    Vector2 seperation = Vector2Subtract(&a_2, &a_1);
+    f32 denominator = Vector2Cross(&b_1, &b_2);
+    if (denominator == 0) return (Vector2) { NAN, NAN };
+
+    // intersection when t_1 > 0 and 0 < t_2 < 1
+    f32 t_1 = Vector2Cross(&seperation, &b_2) / denominator;
+    f32 t_2 = Vector2Cross(&seperation, &b_1) / denominator;
+    if (t_1 > 0.0 && t_2 > 0.0 && t_2 < 1.0) {
+        return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
+    }
+
+    return (Vector2) { NAN, NAN };
+}
+
+Vector2 rays_intersect(Ray* ray_1, Ray* ray_2) {
+    Vector2 a_1 = ray_1->start;
+    Vector2 a_2 = ray_2->start;
+    Vector2 b_1 = (Vector2) { cos(ray_1->theta), sin(ray_1->theta) };
+    Vector2 b_2 = (Vector2) { cos(ray_2->theta), sin(ray_2->theta) };
+
+    Vector2 seperation = Vector2Subtract(&a_2, &a_1);
+    f32 denominator = Vector2Cross(&b_1, &b_2);
+    if (denominator == 0) return (Vector2) { NAN, NAN };
+
+    // intersection when t_1, t_2 > 0
+    f32 t_1 = Vector2Cross(&seperation, &b_2) / denominator;
+    f32 t_2 = Vector2Cross(&seperation, &b_1) / denominator;
+    if (t_1 > 0.0 && t_2 > 0.0) {
+        return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
+    }
+
+    return (Vector2) { NAN, NAN };
+}
+
 void add_point_source(Rays *light_rays) {
     if (!IsKeyPressed(KEY_ONE)) return;
     for (int i = 0; i < POINT_SOURCE_RAY_NUMBER; i++) {
@@ -204,10 +293,10 @@ void add_line_source(Rays* light_rays, DrawState* state) {
 
         for (int i = 0; i <= num_rays; i++) {
             f32 scalar = (float) i / num_rays;
-            light_rays->items[light_rays->length]= (Ray) {
-                .start = (Vector2) {
-                    .x = start.x + scalar * (end.x - start.x),
-                    .y = start.y + scalar * (end.y - start.y)
+            light_rays->items[light_rays->length] = (Ray) {
+                .start = {
+                    start.x + scalar * (end.x - start.x),
+                    start.y + scalar * (end.y - start.y)
                 },
                 .theta = theta
             };
@@ -246,13 +335,5 @@ void add_lens(Lines* lenses, DrawState* state) {
     }
 
     state->drawing_lens = !state->drawing_lens;
-}
-
-bool line_intersects(Line* line_1, Line* line_2) {
-    return NULL;
-}
-
-bool intersects(Ray* ray, Line* line) {
-    return NULL;
 }
 
