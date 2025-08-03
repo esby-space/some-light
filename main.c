@@ -1,29 +1,31 @@
 #include <float.h>
-#define Ray RAYLIB_Ray
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <raylib.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdlib.h>
+
+#define Ray RAYLIB_Ray
+#include <raylib.h>
 #undef Ray
 
-typedef float    f32;
-typedef double   f64;
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-typedef int8_t   i8;
-typedef int16_t  i16;
-typedef int32_t  i32;
-typedef int64_t  i64;
-typedef size_t   usize;
-typedef ssize_t  isize;
+typedef float     f32;
+typedef double    f64;
+typedef uint8_t   u8;
+typedef uint16_t  u16;
+typedef uint32_t  u32;
+typedef uint64_t  u64;
+typedef int8_t    i8;
+typedef int16_t   i16;
+typedef int32_t   i32;
+typedef int64_t   i64;
+typedef uintptr_t usize;
+typedef intptr_t  isize;
 
 const u32 MAX_LENGTH = 2048;
+const f32 EPSILON = 1e-4;
 
 const u32 WIDTH = 1200;
 const u32 HEIGHT = 800;
@@ -93,6 +95,8 @@ void add_point_source(Rays*);
 void add_line_source(Rays*, DrawState*);
 void add_mirror(Lines* mirrors, DrawState* state);
 void add_lens(Lines* mirrors, DrawState* state);
+
+void test_mirrors(Rays* light_rays, Lines* mirrors);
 
 int main() {
     InitWindow(WIDTH, HEIGHT, "esby is confused");
@@ -250,12 +254,12 @@ Vector2 lines_intersect(Line* line_1, Line* line_2) {
 
     Vector2 separation = Vector2Subtract(&a_2, &a_1);
     f32 denominator = Vector2Cross(&b_1, &b_2);
-    if (denominator == 0) return (Vector2) { NAN, NAN };
+    if (fabs(denominator) < EPSILON) return (Vector2) { NAN, NAN };
 
     // intersection when 0 < t_1, t_2 < 1
     f32 t_1 = Vector2Cross(&separation, &b_2) / denominator;
     f32 t_2 = Vector2Cross(&separation, &b_1) / denominator;
-    if (t_1 > 0.0 && t_1 < 1.0 && t_2 > 0.0 && t_2 < 1.0) {
+    if (t_1 > EPSILON && t_1 < 1.0  - EPSILON && t_2 > EPSILON && t_2 < 1.0 - EPSILON) {
         return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
     }
 
@@ -270,12 +274,12 @@ Vector2 ray_line_intersect(Ray* ray, Line* line) {
 
     Vector2 separation = Vector2Subtract(&a_2, &a_1);
     f32 denominator = Vector2Cross(&b_1, &b_2);
-    if (denominator == 0) return (Vector2) { NAN, NAN };
+    if (fabs(denominator) < EPSILON) return (Vector2) { NAN, NAN };
 
     // intersection when t_1 > 0 and 0 < t_2 < 1
     f32 t_1 = Vector2Cross(&separation, &b_2) / denominator;
     f32 t_2 = Vector2Cross(&separation, &b_1) / denominator;
-    if (t_1 > 0.0 && t_2 > 0.0 && t_2 < 1.0) {
+    if (t_1 > EPSILON && t_2 > EPSILON && t_2 < 1.0 - EPSILON) {
         return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
     }
 
@@ -290,12 +294,12 @@ Vector2 rays_intersect(Ray* ray_1, Ray* ray_2) {
 
     Vector2 separation = Vector2Subtract(&a_2, &a_1);
     f32 denominator = Vector2Cross(&b_1, &b_2);
-    if (denominator == 0) return (Vector2) { NAN, NAN };
+    if (fabs(denominator) < EPSILON) return (Vector2) { NAN, NAN };
 
     // intersection when t_1, t_2 > 0
     f32 t_1 = Vector2Cross(&separation, &b_2) / denominator;
     f32 t_2 = Vector2Cross(&separation, &b_1) / denominator;
-    if (t_1 > 0.0 && t_2 > 0.0) {
+    if (t_1 > EPSILON && t_2 > EPSILON) {
         return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
     }
 
@@ -305,7 +309,7 @@ Vector2 rays_intersect(Ray* ray_1, Ray* ray_2) {
 Vector2 closest_intersection(Ray* ray, Lines* lines, usize* index) {
     Vector2 closest_intersection = (Vector2) { NAN, NAN };
     f32 closest_distance = FLT_MAX;
-    *index = NAN;
+    *index = (usize) - 1;
 
     for (int i = 0; i < lines->length; i++) {
         Line line = lines->items[i];
@@ -393,3 +397,19 @@ void add_lens(Lines* lenses, DrawState* state) {
     state->drawing_lens = !state->drawing_lens;
 }
 
+void test_mirrors(Rays* light_rays, Lines* mirrors) {
+    light_rays->items[light_rays->length] = (Ray) {
+        .start = { 500, 500 },
+        .theta = -1
+    };
+
+    light_rays->length++;
+
+    mirrors->items[mirrors->length] = (Line) {
+        .start = { 700, 100 },
+        .end = { 800, 100 }
+    };
+
+    mirrors->length++;
+
+}
