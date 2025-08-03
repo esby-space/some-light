@@ -1,7 +1,6 @@
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,30 +10,10 @@
 #include <raylib.h>
 #undef Ray
 
-typedef float     f32;
-typedef double    f64;
-typedef uint8_t   u8;
-typedef uint16_t  u16;
-typedef uint32_t  u32;
-typedef uint64_t  u64;
-typedef int8_t    i8;
-typedef int16_t   i16;
-typedef int32_t   i32;
-typedef int64_t   i64;
-typedef uintptr_t usize;
-typedef intptr_t  isize;
-
-const u32 MAX_LENGTH = 2048;
-const f32 EPSILON = 1e-4;
-
-const u32 WIDTH = 1200;
-const u32 HEIGHT = 800;
-const u32 TEXT_HEIGHT = 16;
-const u32 TEXT_PADDING = 4;
-
-const u32 LIGHT_RAY_LENGTH = 4096;
-const u32 POINT_SOURCE_RAY_NUMBER = 32;
-const u32 LINE_SOURCE_RAY_DISTANCE = 32;
+#include "types.c"
+#include "constants.c"
+#include "vectors.c"
+#include "lines.c"
 
 //////////////
 // OVERVIEW //
@@ -45,17 +24,6 @@ const u32 LINE_SOURCE_RAY_DISTANCE = 32;
 //    over `LightRays` and components to generate `light_lines` array.
 // 3. Iterate over `light_lines` to render final output.
 
-// structs
-typedef struct {
-    Vector2 start;
-    f32 theta;
-} Ray;
-
-typedef struct {
-    Vector2 start;
-    Vector2 end;
-} Line;
-
 typedef struct {
     bool drawing_line_source;
     bool drawing_mirror;
@@ -65,36 +33,21 @@ typedef struct {
     Vector2 mirror_start;
 } DrawState;
 
-// arrays
 typedef struct {
-    Ray *items;
-    u32 length;
-    u32 capacity;
-} Rays;
+    Line line;
+    f32 focal_length;
+} Lens;
 
 typedef struct {
-    Line *items;
-    u32 length;
-    u32 capacity;
-} Lines;
-
-Vector2 Vector2Add(Vector2* v, Vector2* w);
-Vector2 Vector2Subtract(Vector2* v, Vector2* w);
-Vector2 Vector2Scale(Vector2* v, f32 a);
-f32 Vector2Length(Vector2* v);
-f32 Vector2Direction(Vector2* v);
-f32 Vector2Dot(Vector2* a, Vector2* b);
-f32 Vector2Cross(Vector2* a, Vector2* b);
-
-Vector2 lines_intersect(Line* line_1, Line* line_2);
-Vector2 ray_line_intersect(Ray* ray, Line* line);
-Vector2 rays_intersect(Ray* ray_1, Ray* ray_2);
-Vector2 closest_intersection(Ray* ray, Lines* lines, usize* index);
+    Lens* items;
+    usize length;
+    usize capacity;
+} Lenses;
 
 void add_point_source(Rays*);
 void add_line_source(Rays*, DrawState*);
 void add_mirror(Lines* mirrors, DrawState* state);
-void add_lens(Lines* mirrors, DrawState* state);
+void add_lens(Lenses* mirrors, DrawState* state);
 
 void test_mirrors(Rays* light_rays, Lines* mirrors);
 
@@ -129,8 +82,8 @@ int main() {
         .capacity = MAX_LENGTH
     };
 
-    Line lens_buffer[MAX_LENGTH];
-    Lines lenses = {
+    Lens lens_buffer[MAX_LENGTH];
+    Lenses lenses = {
         .items = lens_buffer,
         .length = 0,
         .capacity = MAX_LENGTH
@@ -197,7 +150,7 @@ int main() {
         }
 
         for (int i = 0; i < lenses.length; i++) {
-            Line line = lenses.items[i];
+            Line line = lenses.items[i].line;
             DrawLine(line.start.x, line.start.y, line.end.x, line.end.y, BLUE);
         }
 
@@ -214,118 +167,6 @@ int main() {
 
     CloseWindow();
     return 0;
-}
-
-Vector2 Vector2Add(Vector2* v, Vector2* w) {
-    return (Vector2) { v->x + w->x, v->y + w->y };
-}
-
-Vector2 Vector2Subtract(Vector2* v, Vector2* w) {
-    return (Vector2) { v->x - w->x, v->y - w->y };
-}
-
-Vector2 Vector2Scale(Vector2* v, f32 a) {
-    return (Vector2) { a * v->x, a * v->y };
-}
-
-f32 Vector2Length(Vector2* v) {
-    return sqrt(pow(v->x, 2) + pow(v->y, 2));
-}
-
-f32 Vector2Direction(Vector2* v) {
-    return atan2(v->y, v->x);
-}
-
-f32 Vector2Dot(Vector2* a, Vector2* b) {
-    return a->x * b->x + a->y * b->y;
-}
-
-f32 Vector2Cross(Vector2* a, Vector2* b) {
-    return a->x * b->y - a->y * b->x;
-}
-
-// line segment = a + bt where a = start, b = end - start, 0 < t < 1
-// t_1 = (a_2 - a_1) X b_2 / (b_1 X b_2), t_2 = (a_2 - a_1) X b_1 / (b_1 X b_2)
-Vector2 lines_intersect(Line* line_1, Line* line_2) {
-    Vector2 a_1 = line_1->start;
-    Vector2 a_2 = line_2->start;
-    Vector2 b_1 = Vector2Subtract(&line_1->end, &line_1->start);
-    Vector2 b_2 = Vector2Subtract(&line_2->end, &line_2->start);
-
-    Vector2 separation = Vector2Subtract(&a_2, &a_1);
-    f32 denominator = Vector2Cross(&b_1, &b_2);
-    if (fabs(denominator) < EPSILON) return (Vector2) { NAN, NAN };
-
-    // intersection when 0 < t_1, t_2 < 1
-    f32 t_1 = Vector2Cross(&separation, &b_2) / denominator;
-    f32 t_2 = Vector2Cross(&separation, &b_1) / denominator;
-    if (t_1 > EPSILON && t_1 < 1.0  - EPSILON && t_2 > EPSILON && t_2 < 1.0 - EPSILON) {
-        return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
-    }
-
-    return (Vector2) { NAN, NAN };
-}
-
-Vector2 ray_line_intersect(Ray* ray, Line* line) {
-    Vector2 a_1 = ray->start;
-    Vector2 a_2 = line->start;
-    Vector2 b_1 = (Vector2) { cos(ray->theta), sin(ray->theta) };
-    Vector2 b_2 = Vector2Subtract(&line->end, &line->start);
-
-    Vector2 separation = Vector2Subtract(&a_2, &a_1);
-    f32 denominator = Vector2Cross(&b_1, &b_2);
-    if (fabs(denominator) < EPSILON) return (Vector2) { NAN, NAN };
-
-    // intersection when t_1 > 0 and 0 < t_2 < 1
-    f32 t_1 = Vector2Cross(&separation, &b_2) / denominator;
-    f32 t_2 = Vector2Cross(&separation, &b_1) / denominator;
-    if (t_1 > EPSILON && t_2 > EPSILON && t_2 < 1.0 - EPSILON) {
-        return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
-    }
-
-    return (Vector2) { NAN, NAN };
-}
-
-Vector2 rays_intersect(Ray* ray_1, Ray* ray_2) {
-    Vector2 a_1 = ray_1->start;
-    Vector2 a_2 = ray_2->start;
-    Vector2 b_1 = (Vector2) { cos(ray_1->theta), sin(ray_1->theta) };
-    Vector2 b_2 = (Vector2) { cos(ray_2->theta), sin(ray_2->theta) };
-
-    Vector2 separation = Vector2Subtract(&a_2, &a_1);
-    f32 denominator = Vector2Cross(&b_1, &b_2);
-    if (fabs(denominator) < EPSILON) return (Vector2) { NAN, NAN };
-
-    // intersection when t_1, t_2 > 0
-    f32 t_1 = Vector2Cross(&separation, &b_2) / denominator;
-    f32 t_2 = Vector2Cross(&separation, &b_1) / denominator;
-    if (t_1 > EPSILON && t_2 > EPSILON) {
-        return (Vector2) { a_1.x + b_1.x * t_1, a_1.y + b_1.y * t_1 };
-    }
-
-    return (Vector2) { NAN, NAN };
-}
-
-Vector2 closest_intersection(Ray* ray, Lines* lines, usize* index) {
-    Vector2 closest_intersection = (Vector2) { NAN, NAN };
-    f32 closest_distance = FLT_MAX;
-    *index = (usize) - 1;
-
-    for (int i = 0; i < lines->length; i++) {
-        Line line = lines->items[i];
-        Vector2 intersection = ray_line_intersect(ray, &line);
-        if (isnan(intersection.x) || isnan(intersection.y)) continue;
-
-        Vector2 delta = Vector2Subtract(&ray->start, &intersection);
-        f32 distance = Vector2Length(&delta);
-        if (distance < closest_distance) {
-            closest_distance = distance;
-            closest_intersection = intersection;
-            *index = i;
-        }
-    }
-
-    return closest_intersection;
 }
 
 void add_point_source(Rays *light_rays) {
@@ -382,14 +223,18 @@ void add_mirror(Lines* mirrors, DrawState* state) {
     state->drawing_mirror = !state->drawing_mirror;
 }
 
-void add_lens(Lines* lenses, DrawState* state) {
+void add_lens(Lenses* lenses, DrawState* state) {
     if (!IsKeyPressed(KEY_FOUR)) return;
     if (!state->drawing_lens) {
         state->lens_start = GetMousePosition();
     } else {
-        lenses->items[lenses->length] = (Line) {
-            .start = state->lens_start,
-            .end = GetMousePosition()
+        // FIX: focal length hardcoded
+        lenses->items[lenses->length] = (Lens) {
+            .line = {
+                .start = state->lens_start,
+                .end = GetMousePosition()
+            },
+            .focal_length = 100.0 
         };
         lenses->length++;
     }
