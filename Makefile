@@ -1,5 +1,5 @@
 CC=clang
-FLAGS=-std=c99 -Wall
+FLAGS=-std=c99 -Wall -Werror
 LIBS=$(shell pkg-config --libs --cflags raylib)
 
 all: main

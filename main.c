@@ -1,5 +1,6 @@
 #include <float.h>
 #include <math.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,17 @@ typedef struct {
     usize length;
     usize capacity;
 } Lenses;
+
+Lens Lenses_Get(Lenses* lenses, usize index) {
+    if (index < 0 || index >= lenses->length) { raise(SIGTRAP); }
+    return lenses->items[index]; 
+}
+
+void Lenses_Push(Lenses* lenses, Lens lens) {
+    if (lenses->length == lenses->capacity) { raise(SIGTRAP); }
+    lenses->items[lenses->length] = lens;
+    lenses->length++;
+}
 
 void add_point_source(Rays*);
 void add_line_source(Rays*, DrawState*);
@@ -100,39 +112,34 @@ int main() {
 
         // generate `light_lines` every frame based on components
         for (int i = 0; i < light_rays.length; i++) {
-            Ray ray = light_rays.items[i];
+            Ray ray = Rays_Get(&light_rays, i);
 
             usize mirror_index;
             Vector2 intersection = closest_intersection(&ray, &mirrors, &mirror_index);
 
             while (!isnan(intersection.x) || !isnan(intersection.y)) {
-                Line mirror = mirrors.items[mirror_index];
-                Vector2 mirror_delta = Vector2Subtract(&mirror.end, &mirror.start);
-
-                light_lines.items[light_lines.length] = (Line) {
+                Lines_Push(&light_lines, (Line) {
                     .start = ray.start,
                     .end = intersection
-                };
+                });
 
-                light_lines.length++;
+                Line mirror = mirrors.items[mirror_index];
+                Vector2 mirror_delta = Vector2_Subtract(&mirror.end, &mirror.start);
 
                 ray.start = intersection;
-                ray.theta = 2 * Vector2Direction(&mirror_delta) - ray.theta;
+                ray.theta = 2 * Vector2_Direction(&mirror_delta) - ray.theta;
                 intersection = closest_intersection(&ray, &mirrors, &mirror_index);
             }
 
             // TODO: implement lenses
-
             // add in the rest of the ray
-            light_lines.items[light_lines.length] = (Line) {
+            Lines_Push(&light_lines, (Line) {
                 .start = ray.start,
                 .end = {
                     ray.start.x + LIGHT_RAY_LENGTH * cos(ray.theta),
                     ray.start.y + LIGHT_RAY_LENGTH * sin(ray.theta),
                 }
-            };
-
-            light_lines.length++;
+            });
         }
 
         // draw all `light_lines` and components
@@ -140,17 +147,17 @@ int main() {
         ClearBackground(BLACK);
 
         for (int i = 0; i < light_lines.length; i++) {
-            Line line = light_lines.items[i];
+            Line line = Lines_Get(&light_lines, i);
             DrawLine(line.start.x, line.start.y, line.end.x, line.end.y, WHITE);
         }
 
         for (int i = 0; i < mirrors.length; i++) {
-            Line line = mirrors.items[i];
+            Line line = Lines_Get(&mirrors, i);
             DrawLine(line.start.x, line.start.y, line.end.x, line.end.y, GRAY);
         }
 
         for (int i = 0; i < lenses.length; i++) {
-            Line line = lenses.items[i].line;
+            Line line = Lenses_Get(&lenses, i).line;
             DrawLine(line.start.x, line.start.y, line.end.x, line.end.y, BLUE);
         }
 
@@ -172,11 +179,10 @@ int main() {
 void add_point_source(Rays *light_rays) {
     if (!IsKeyPressed(KEY_ONE)) return;
     for (int i = 0; i < POINT_SOURCE_RAY_NUMBER; i++) {
-        light_rays->items[light_rays->length] = (Ray) {
+        Rays_Push(light_rays, (Ray) {
             .start = GetMousePosition(),
             .theta = 2 * PI * i / POINT_SOURCE_RAY_NUMBER
-        };
-        light_rays->length++;
+        });
     }
 }
 
@@ -187,21 +193,20 @@ void add_line_source(Rays* light_rays, DrawState* state) {
     } else {
         Vector2 start = state->line_source_start;
         Vector2 end = GetMousePosition();
-        Vector2 delta = Vector2Subtract(&end, &start);
+        Vector2 delta = Vector2_Subtract(&end, &start);
 
-        u32 num_rays = (u32) (Vector2Length(&delta) / LINE_SOURCE_RAY_DISTANCE);
-        f32 theta = Vector2Direction(&delta) - PI / 2;
+        u32 num_rays = (u32) (Vector2_Length(&delta) / LINE_SOURCE_RAY_DISTANCE);
+        f32 theta = Vector2_Direction(&delta) - PI / 2;
 
         for (int i = 0; i <= num_rays; i++) {
             f32 scalar = (float) i / num_rays;
-            light_rays->items[light_rays->length] = (Ray) {
+            Rays_Push(light_rays, (Ray) {
                 .start = {
                     start.x + scalar * delta.x,
                     start.y + scalar * delta.y
                 },
                 .theta = theta
-            };
-            light_rays->length++;
+            });
         }
     }
 
@@ -213,11 +218,10 @@ void add_mirror(Lines* mirrors, DrawState* state) {
     if (!state->drawing_mirror) {
         state->mirror_start = GetMousePosition();
     } else {
-        mirrors->items[mirrors->length] = (Line) {
+        Lines_Push(mirrors, (Line) {
             .start = state->mirror_start,
             .end = GetMousePosition()
-        };
-        mirrors->length++;
+        });
     }
 
     state->drawing_mirror = !state->drawing_mirror;
@@ -228,33 +232,26 @@ void add_lens(Lenses* lenses, DrawState* state) {
     if (!state->drawing_lens) {
         state->lens_start = GetMousePosition();
     } else {
-        // FIX: focal length hardcoded
-        lenses->items[lenses->length] = (Lens) {
+        Lenses_Push(lenses, (Lens) {
             .line = {
                 .start = state->lens_start,
                 .end = GetMousePosition()
             },
             .focal_length = 100.0 
-        };
-        lenses->length++;
+        });
     }
 
     state->drawing_lens = !state->drawing_lens;
 }
 
 void test_mirrors(Rays* light_rays, Lines* mirrors) {
-    light_rays->items[light_rays->length] = (Ray) {
+    Rays_Push(light_rays, (Ray) {
         .start = { 500, 500 },
         .theta = -1
-    };
+    });
 
-    light_rays->length++;
-
-    mirrors->items[mirrors->length] = (Line) {
+    Lines_Push(mirrors, (Line) {
         .start = { 700, 100 },
         .end = { 800, 100 }
-    };
-
-    mirrors->length++;
-
+    });
 }
