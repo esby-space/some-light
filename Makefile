@@ -5,8 +5,12 @@ LIBS=$(shell pkg-config --libs --cflags raylib)
 all: main
 
 main: main.c
+	mkdir -p build
 	$(CC) main.c $(LIBS) $(FLAGS) -o build/main
 
-clean:
-	rm ./main
+run:
+	make
+	./build/main
 
+clean:
+	rm -rf build
