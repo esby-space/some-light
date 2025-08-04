@@ -16,7 +16,7 @@
 // positive angles corresponding to clockwise rotation.
 // 
 // When a light ray  and optical component form an angle ⍺ and β with the
-// horizontal respectively the light ray forms an angle θ_1 = π/2 + ⍺ - β
+// horizontal respectively, the light ray forms an angle θ_1 = π/2 + ⍺ - β
 // relative to the normal of the component at a displacement x_1 from the center
 // of the component. The light ray is then reflected or refracted at an angle
 // θ_2 relative to the normal at a displacement x_2 according to the [Ray
@@ -83,8 +83,10 @@ void add_lens(Lenses*, DrawState*);
 
 f32 reflect_mirror(Ray*, Line*);
 f32 refract_lens(Ray*, Lens*);
+
 void test_mirror(Rays*, Lines*);
 void test_lens(Rays*, Lenses*);
+void test_lens_2(Rays*, Lenses*);
 
 i32 main() {
     InitWindow(WIDTH, HEIGHT, "esby is confused");
@@ -134,7 +136,7 @@ i32 main() {
         .capacity = MAX_LENGTH
     };
 
-    test_lens(&light_rays, &lenses);
+    test_lens_2(&light_rays, &lenses);
 
     while (!WindowShouldClose()) {
         // add light sources and generate `light_rays` array
@@ -154,7 +156,7 @@ i32 main() {
             usize mirror_index = closest_intersection(&ray, &mirrors, &mirror_intersection, &mirror_distance);
             usize lens_index = closest_intersection(&ray, &lenses.lines, &lens_intersection, &lens_distance);
 
-            while (mirror_index != -1 || lens_index != -1) {
+            while (mirror_index != (usize) -1 || lens_index != (usize) -1) {
                 // IDEA: take minimum of components, use result to pick intersection and refraction function
                 if (mirror_distance < lens_distance) {
                     Lines_Push(&light_lines, (Line) {
@@ -166,7 +168,7 @@ i32 main() {
                     ray.angle = reflect_mirror(&ray, &mirror);
                     ray.start = mirror_intersection;
                     mirror_index = closest_intersection(&ray, &mirrors, &mirror_intersection, &mirror_distance);
-                    lens_index = closest_intersection(&ray, &lens_lines, &lens_intersection, &lens_distance);
+                    lens_index = closest_intersection(&ray, &lenses.lines, &lens_intersection, &lens_distance);
                 }
 
                 if (lens_distance < mirror_distance) {
@@ -179,7 +181,7 @@ i32 main() {
                     ray.angle = refract_lens(&ray, &lens);
                     ray.start = lens_intersection;
                     mirror_index = closest_intersection(&ray, &mirrors, &mirror_intersection, &mirror_distance);
-                    lens_index = closest_intersection(&ray, &lens_lines, &lens_intersection, &lens_distance);
+                    lens_index = closest_intersection(&ray, &lenses.lines, &lens_intersection, &lens_distance);
                 }
             }
 
@@ -349,6 +351,29 @@ void test_lens(Rays *light_rays, Lenses *lenses) {
         .line = {
             .start = { 500, 100 },
             .end = { 500, 700 },
+        }
+    });
+}
+
+void test_lens_2(Rays *light_rays, Lenses *lenses) {
+    Rays_Push(light_rays, (Ray) {
+        .start = { 200, 200 },
+        .angle = 0
+    });
+
+    Lenses_Push(lenses, (Lens) {
+        .focal_length = 300,
+        .line = {
+            .start = { 500, 100 },
+            .end = { 500, 700 },
+        }
+    });
+
+    Lenses_Push(lenses, (Lens) {
+        .focal_length = 300,
+        .line = {
+            .start = { 700, 100 },
+            .end = { 700, 700 },
         }
     });
 }

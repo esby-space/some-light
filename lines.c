@@ -133,7 +133,7 @@ usize closest_intersection(Ray *ray, Lines *lines, Vector2 *intersection, f32 *d
     *distance = FLT_MAX;
     usize index = (usize) -1;
 
-    for (int i = 0; i < lines->length; i++) {
+    for (i32 i = 0; i < lines->length; i++) {
         Line line = Lines_Get(lines, i);
         Vector2 test_intersection = ray_line_intersect(ray, &line);
         if (isnan(test_intersection.x) || isnan(test_intersection.y)) continue;
