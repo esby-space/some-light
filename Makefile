@@ -1,6 +1,6 @@
 CC=clang
 FLAGS=-std=c99 -Wall -Werror
-DEV=-fcolor-diagnostics -fansi-escape-codes -fsantize=address -g
+DEV=-fcolor-diagnostics -fansi-escape-codes -fsanitize=address -g
 RELEASE=-O3
 LIBS=$(shell pkg-config --libs --cflags raylib)
 

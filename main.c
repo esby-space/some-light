@@ -37,7 +37,7 @@
 
 #include "lib/types.c"
 #include "lib/arena.c"
-#include "lib/array.c"
+#include "lib/list.c"
 #include "lib/vectors.c"
 
 #include "constants.c"
@@ -101,7 +101,7 @@ i32 main() {
             while (mirror_index != (usize) -1 || lens_index != (usize) -1) {
                 // IDEA: take minimum of components, use result to pick intersection and refraction function
                 if (mirror_distance < lens_distance) {
-                    *Array_Push(&light_lines, &arena) = (Line) {
+                    *List_Push(&light_lines, &arena) = (Line) {
                         .start = ray.start,
                         .end = mirror_intersection
                     };
@@ -114,7 +114,7 @@ i32 main() {
                 }
 
                 if (lens_distance < mirror_distance) {
-                    *Array_Push(&light_lines, &arena) = (Line) {
+                    *List_Push(&light_lines, &arena) = (Line) {
                         .start = ray.start,
                         .end = lens_intersection
                     };
@@ -130,7 +130,7 @@ i32 main() {
             // add in the rest of the ray
             Vector2 light_vector = Ray_ToVector(&ray);
             Vector2 scaled_vector = Vector2_Scale(&light_vector, LIGHT_RAY_LENGTH);
-            *Array_Push(&light_lines, &arena) = (Line) {
+            *List_Push(&light_lines, &arena) = (Line) {
                 .start = ray.start,
                 .end = Vector2_Add(&ray.start, &scaled_vector)
             };
@@ -174,7 +174,7 @@ i32 main() {
 void add_point_source(Rays *light_rays, Arena *arena) {
     if (!IsKeyPressed(KEY_ONE)) return;
     for (i32 i = 0; i < POINT_SOURCE_RAY_NUMBER; i++) {
-        *Array_Push(light_rays, arena) = (Ray) {
+        *List_Push(light_rays, arena) = (Ray) {
             .start = GetMousePosition(),
             .angle = 2 * PI * i / POINT_SOURCE_RAY_NUMBER
         };
@@ -195,7 +195,7 @@ void add_line_source(Rays *light_rays, DrawState *state, Arena *arena) {
 
         for (i32 i = 0; i <= num_rays; i++) {
             f32 scalar = (float) i / num_rays;
-            *Array_Push(light_rays, arena) = (Ray) {
+            *List_Push(light_rays, arena) = (Ray) {
                 .start = {
                     start.x + scalar * delta.x,
                     start.y + scalar * delta.y
@@ -213,7 +213,7 @@ void add_mirror(Lines *mirrors, DrawState *state, Arena *arena) {
     if (!state->drawing_mirror) {
         state->mirror_start = GetMousePosition();
     } else {
-        *Array_Push(mirrors, arena) = (Line) {
+        *List_Push(mirrors, arena) = (Line) {
             .start = state->mirror_start,
             .end = GetMousePosition()
         };
@@ -228,7 +228,7 @@ void add_lens(Lenses *lenses, DrawState *state, Arena *arena) {
     if (!state->drawing_lens) {
         state->lens_start = GetMousePosition();
     } else {
-        *Array_Push(lenses, arena) = (Lens) {
+        *List_Push(lenses, arena) = (Lens) {
             .line = {
                 .start = state->lens_start,
                 .end = GetMousePosition()
@@ -241,12 +241,12 @@ void add_lens(Lenses *lenses, DrawState *state, Arena *arena) {
 }
 
 void test_mirror(Rays *light_rays, Lines *mirrors, Arena *arena) {
-    *Array_Push(light_rays, arena) = (Ray) {
+    *List_Push(light_rays, arena) = (Ray) {
         .start = { 500, 500 },
         .angle = -1
     };
 
-    *Array_Push(mirrors, arena) = (Line) {
+    *List_Push(mirrors, arena) = (Line) {
         .start = { 700, 100 },
         .end = { 800, 100 }
     };
@@ -255,7 +255,7 @@ void test_mirror(Rays *light_rays, Lines *mirrors, Arena *arena) {
 void test_lens(Rays *light_rays, Lenses *lenses, Arena *arena) {
     i32 num_rays = 11;
     for (i32 i = 0; i < num_rays; i++) {
-        *Array_Push(light_rays, arena) = (Ray) {
+        *List_Push(light_rays, arena) = (Ray) {
             .start = {
                 200,
                 150 + 50 * i
@@ -264,7 +264,7 @@ void test_lens(Rays *light_rays, Lenses *lenses, Arena *arena) {
         };
     }
 
-    *Array_Push(lenses, arena) = (Lens) {
+    *List_Push(lenses, arena) = (Lens) {
         .focal_length = 300,
         .line = {
             .start = { 500, 100 },
@@ -274,12 +274,12 @@ void test_lens(Rays *light_rays, Lenses *lenses, Arena *arena) {
 }
 
 void test_lens_2(Rays *light_rays, Lenses *lenses, Arena *arena) {
-    *Array_Push(light_rays, arena) = (Ray) {
+    *List_Push(light_rays, arena) = (Ray) {
         .start = { 200, 200 },
         .angle = 0
     };
 
-    *Array_Push(lenses, arena) = (Lens) {
+    *List_Push(lenses, arena) = (Lens) {
         .focal_length = 300,
         .line = {
             .start = { 500, 100 },
@@ -287,7 +287,7 @@ void test_lens_2(Rays *light_rays, Lenses *lenses, Arena *arena) {
         }
     };
 
-    *Array_Push(lenses, arena) = (Lens) {
+    *List_Push(lenses, arena) = (Lens) {
         .focal_length = 300,
         .line = {
             .start = { 700, 100 },

@@ -1,19 +1,19 @@
-#ifndef ARRAY
-#define ARRAY
+#ifndef LIST
+#define LIST
 
 #include "arena.c"
 
 // https://nullprogram.com/blog/2023/10/05/
 
-#define Array_Push(slice, arena) \
+#define List_Push(slice, arena) \
     ((slice)->length >= (slice)->capacity \
-        ? Array_Grow(slice, sizeof(*(slice)->data), arena), \
+        ? List_Grow(slice, sizeof(*(slice)->data), arena), \
           (slice)->data + (slice)->length++ \
         : (slice)->data + (slice)->length++)
 
 
 
-static void Array_Grow(void *slice, ptrdiff_t size, Arena *arena) {
+static void List_Grow(void *slice, ptrdiff_t size, Arena *arena) {
     struct {
         void     *data;
         ptrdiff_t length;
