@@ -9,9 +9,9 @@
 #include <raylib.h>
 #undef Ray
 
-#include "types.c"
+#include "lib/types.c"
 #include "constants.c"
-#include "vectors.c"
+#include "lib/vectors.c"
 
 typedef struct {
     Vector2 start;
@@ -24,38 +24,38 @@ typedef struct {
 } Line;
 
 typedef struct {
-    Ray *items;
+    Ray *data;
     usize length;
     usize capacity;
 } Rays;
 
 typedef struct {
-    Line *items;
+    Line *data;
     usize length;
     usize capacity;
 } Lines;
 
 Line Lines_Get(Lines *lines, usize index) {
     if (index < 0 || index >= lines->length) { raise(SIGTRAP); }
-    return lines->items[index]; 
+    return lines->data[index]; 
 }
 
 Ray Rays_Get(Rays *rays, usize index) {
     if (index < 0 || index >= rays->length) { raise(SIGTRAP); }
-    return rays->items[index]; 
+    return rays->data[index]; 
 }
 
-void Lines_Push(Lines *lines, Line line) {
-    if (lines->length == lines->capacity) { raise(SIGTRAP); }
-    lines->items[lines->length] = line;
-    lines->length++;
-}
-
-void Rays_Push(Rays *rays, Ray ray) {
-    if (rays->length == rays->capacity) { raise(SIGTRAP); }
-    rays->items[rays->length] = ray;
-    rays->length++;
-}
+// void Lines_Push(Lines *lines, Line line) {
+//     if (lines->length == lines->capacity) { raise(SIGTRAP); }
+//     lines->data[lines->length] = line;
+//     lines->length++;
+// }
+//
+// void Rays_Push(Rays *rays, Ray ray) {
+//     if (rays->length == rays->capacity) { raise(SIGTRAP); }
+//     rays->data[rays->length] = ray;
+//     rays->length++;
+// }
 
 Vector2 Ray_ToVector(Ray *ray) {
     return (Vector2) { cos(ray->angle), sin(ray->angle) };
@@ -150,3 +150,4 @@ usize closest_intersection(Ray *ray, Lines *lines, Vector2 *intersection, f32 *d
 }
 
 #endif
+

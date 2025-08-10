@@ -25,8 +25,6 @@
 // ray forms an angle ⍺' = β + θ_2 - π/2.
 
 #include <float.h>
-#include <math.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,10 +35,14 @@
 #include <raylib.h>
 #undef Ray
 
-#include "types.c"
+#include "lib/types.c"
+#include "lib/arena.c"
+#include "lib/array.c"
+#include "lib/vectors.c"
+
 #include "constants.c"
-#include "vectors.c"
 #include "lines.c"
+#include "optics.c"
 
 typedef struct {
     bool drawing_line_source;
@@ -51,46 +53,21 @@ typedef struct {
     Vector2 mirror_start;
 } DrawState;
 
-typedef struct {
-    Line line;
-    f32 focal_length;
-} Lens;
+void add_point_source(Rays*, Arena*);
+void add_line_source(Rays*, DrawState*, Arena*);
+void add_mirror(Lines*, DrawState*, Arena*);
+void add_lens(Lenses*, DrawState*, Arena*);
 
-typedef struct {
-    Lens *items;
-    Lines lines;
-    usize length;
-    usize capacity;
-} Lenses;
-
-Lens Lenses_Get(Lenses *lenses, usize index) {
-    if (index < 0 || index >= lenses->length) { raise(SIGTRAP); }
-    return lenses->items[index]; 
-}
-
-// IDEA: should push functions take a reference instead of value?
-void Lenses_Push(Lenses *lenses, Lens lens) {
-    if (lenses->length == lenses->capacity) { raise(SIGTRAP); }
-    Lines_Push(&lenses->lines, lens.line);
-    lenses->items[lenses->length] = lens;
-    lenses->length++;
-}
-
-void add_point_source(Rays*);
-void add_line_source(Rays*, DrawState*);
-void add_mirror(Lines*, DrawState*);
-void add_lens(Lenses*, DrawState*);
-
-f32 reflect_mirror(Ray*, Line*);
-f32 refract_lens(Ray*, Lens*);
-
-void test_mirror(Rays*, Lines*);
-void test_lens(Rays*, Lenses*);
-void test_lens_2(Rays*, Lenses*);
+void test_mirror(Rays*, Lines*, Arena*);
+void test_lens(Rays*, Lenses*, Arena*);
+void test_lens_2(Rays*, Lenses*, Arena*);
 
 i32 main() {
+    Arena arena = Arena_New(1024 * 1014);
+
     InitWindow(WIDTH, HEIGHT, "esby is confused");
     SetTargetFPS(60);
+    Font font = LoadFontEx("/System/Library/Fonts/Monaco.ttf", 32, 0, 250);
 
     DrawState draw_state = (DrawState) {
         .drawing_line_source = false,
@@ -98,54 +75,19 @@ i32 main() {
         .drawing_lens = false
     };
 
-    // TODO: make cleaner? move to heap?
-    Ray light_ray_buffer[MAX_LENGTH];
-    Rays light_rays = {
-        .items = light_ray_buffer,
-        .length = 0,
-        .capacity = MAX_LENGTH
-    };
-
-    Line light_lines_buffer[MAX_LENGTH];
-    Lines light_lines = {
-        .items = light_lines_buffer,
-        .length = 0,
-        .capacity = MAX_LENGTH
-    };
-
-    Line mirror_buffer[MAX_LENGTH];
-    Lines mirrors = {
-        .items = mirror_buffer,
-        .length = 0,
-        .capacity = MAX_LENGTH
-    };
-
-
-    Line lens_lines_buffer[MAX_LENGTH];
-    Lines lens_lines = {
-        .items = lens_lines_buffer,
-        .length = 0,
-        .capacity = MAX_LENGTH
-    };
-
-    Lens lens_buffer[MAX_LENGTH];
-    Lenses lenses = {
-        .items = lens_buffer,
-        .lines = lens_lines,
-        .length = 0,
-        .capacity = MAX_LENGTH
-    };
-
-    test_lens_2(&light_rays, &lenses);
+    Rays light_rays = { 0 };
+    Lines light_lines = { 0 };
+    Lines mirrors = { 0 };
+    Lenses lenses = { 0 };
 
     while (!WindowShouldClose()) {
         // add light sources and generate `light_rays` array
-        add_point_source(&light_rays);
-        add_line_source(&light_rays, &draw_state);
+        add_point_source(&light_rays, &arena);
+        add_line_source(&light_rays, &draw_state, &arena);
 
         // add components
-        add_mirror(&mirrors, &draw_state);
-        add_lens(&lenses, &draw_state);
+        add_mirror(&mirrors, &draw_state, &arena);
+        add_lens(&lenses, &draw_state, &arena);
 
         // generate `light_lines` every frame based on components
         for (i32 i = 0; i < light_rays.length; i++) {
@@ -154,44 +96,44 @@ i32 main() {
             Vector2 mirror_intersection, lens_intersection;
             f32 mirror_distance, lens_distance;
             usize mirror_index = closest_intersection(&ray, &mirrors, &mirror_intersection, &mirror_distance);
-            usize lens_index = closest_intersection(&ray, &lenses.lines, &lens_intersection, &lens_distance);
+            usize lens_index = closest_lens(&ray, &lenses, &lens_intersection, &lens_distance);
 
             while (mirror_index != (usize) -1 || lens_index != (usize) -1) {
                 // IDEA: take minimum of components, use result to pick intersection and refraction function
                 if (mirror_distance < lens_distance) {
-                    Lines_Push(&light_lines, (Line) {
+                    *Array_Push(&light_lines, &arena) = (Line) {
                         .start = ray.start,
                         .end = mirror_intersection
-                    });
+                    };
 
                     Line mirror = Lines_Get(&mirrors, mirror_index);
                     ray.angle = reflect_mirror(&ray, &mirror);
                     ray.start = mirror_intersection;
                     mirror_index = closest_intersection(&ray, &mirrors, &mirror_intersection, &mirror_distance);
-                    lens_index = closest_intersection(&ray, &lenses.lines, &lens_intersection, &lens_distance);
+                    lens_index = closest_lens(&ray, &lenses, &lens_intersection, &lens_distance);
                 }
 
                 if (lens_distance < mirror_distance) {
-                    Lines_Push(&light_lines, (Line) {
+                    *Array_Push(&light_lines, &arena) = (Line) {
                         .start = ray.start,
                         .end = lens_intersection
-                    });
+                    };
 
                     Lens lens = Lenses_Get(&lenses, lens_index);
                     ray.angle = refract_lens(&ray, &lens);
                     ray.start = lens_intersection;
                     mirror_index = closest_intersection(&ray, &mirrors, &mirror_intersection, &mirror_distance);
-                    lens_index = closest_intersection(&ray, &lenses.lines, &lens_intersection, &lens_distance);
+                    lens_index = closest_lens(&ray, &lenses, &lens_intersection, &lens_distance);
                 }
             }
 
             // add in the rest of the ray
             Vector2 light_vector = Ray_ToVector(&ray);
             Vector2 scaled_vector = Vector2_Scale(&light_vector, LIGHT_RAY_LENGTH);
-            Lines_Push(&light_lines, (Line) {
+            *Array_Push(&light_lines, &arena) = (Line) {
                 .start = ray.start,
                 .end = Vector2_Add(&ray.start, &scaled_vector)
-            });
+            };
         }
 
         // draw all `light_lines` and components
@@ -213,10 +155,10 @@ i32 main() {
             DrawLine(line.start.x, line.start.y, line.end.x, line.end.y, BLUE);
         }
 
-        DrawText("[1] Add point source", 4, 4, TEXT_HEIGHT, LIGHTGRAY);
-        DrawText("[2] Add line source", 4, 4 + 1.5 * TEXT_HEIGHT, TEXT_HEIGHT, LIGHTGRAY);
-        DrawText("[3] Add mirror", 4, 4 + 3 * TEXT_HEIGHT, TEXT_HEIGHT, LIGHTGRAY);
-        DrawText("[4] Add ideal lens", 4, 4 + 4.5 * TEXT_HEIGHT, TEXT_HEIGHT, LIGHTGRAY);
+        DrawTextEx(font, "[1] Add point source", (Vector2) { 4, 4 }, TEXT_HEIGHT, TEXT_SPACING, LIGHTGRAY);
+        DrawTextEx(font, "[2] Add line source", (Vector2) { 4, 4 + 1.2 * TEXT_HEIGHT }, TEXT_HEIGHT, TEXT_SPACING, LIGHTGRAY);
+        DrawTextEx(font,"[3] Add mirror", (Vector2) { 4, 4 + 2.4 * TEXT_HEIGHT }, TEXT_HEIGHT, TEXT_SPACING, LIGHTGRAY);
+        DrawTextEx(font, "[4] Add ideal lens", (Vector2) { 4, 4 + 3.6 * TEXT_HEIGHT }, TEXT_HEIGHT, TEXT_SPACING, LIGHTGRAY);
 
         EndDrawing();
 
@@ -224,21 +166,22 @@ i32 main() {
         light_lines.length = 0;
     }
 
+    Arena_Free(&arena);
     CloseWindow();
     return 0;
 }
 
-void add_point_source(Rays *light_rays) {
+void add_point_source(Rays *light_rays, Arena *arena) {
     if (!IsKeyPressed(KEY_ONE)) return;
     for (i32 i = 0; i < POINT_SOURCE_RAY_NUMBER; i++) {
-        Rays_Push(light_rays, (Ray) {
+        *Array_Push(light_rays, arena) = (Ray) {
             .start = GetMousePosition(),
             .angle = 2 * PI * i / POINT_SOURCE_RAY_NUMBER
-        });
+        };
     }
 }
 
-void add_line_source(Rays *light_rays, DrawState *state) {
+void add_line_source(Rays *light_rays, DrawState *state, Arena *arena) {
     if (!IsKeyPressed(KEY_TWO)) return;
     if (!state->drawing_line_source) {
         state->line_source_start = GetMousePosition();
@@ -252,128 +195,103 @@ void add_line_source(Rays *light_rays, DrawState *state) {
 
         for (i32 i = 0; i <= num_rays; i++) {
             f32 scalar = (float) i / num_rays;
-            Rays_Push(light_rays, (Ray) {
+            *Array_Push(light_rays, arena) = (Ray) {
                 .start = {
                     start.x + scalar * delta.x,
                     start.y + scalar * delta.y
                 },
                 .angle = theta
-            });
+            };
         }
     }
 
     state->drawing_line_source = !state->drawing_line_source;
 }
 
-void add_mirror(Lines *mirrors, DrawState *state) {
+void add_mirror(Lines *mirrors, DrawState *state, Arena *arena) {
     if (!IsKeyPressed(KEY_THREE)) return;
     if (!state->drawing_mirror) {
         state->mirror_start = GetMousePosition();
     } else {
-        Lines_Push(mirrors, (Line) {
+        *Array_Push(mirrors, arena) = (Line) {
             .start = state->mirror_start,
             .end = GetMousePosition()
-        });
+        };
     }
 
     state->drawing_mirror = !state->drawing_mirror;
 }
 
 // TODO: make focal length adjustable
-void add_lens(Lenses *lenses, DrawState *state) {
+void add_lens(Lenses *lenses, DrawState *state, Arena *arena) {
     if (!IsKeyPressed(KEY_FOUR)) return;
     if (!state->drawing_lens) {
         state->lens_start = GetMousePosition();
     } else {
-        Lenses_Push(lenses, (Lens) {
+        *Array_Push(lenses, arena) = (Lens) {
             .line = {
                 .start = state->lens_start,
                 .end = GetMousePosition()
             },
-            .focal_length = 100.0
-        });
+            .focal_length = 300.0
+        };
     }
 
     state->drawing_lens = !state->drawing_lens;
 }
 
-// TODO: maybe make functions more general to any optical device?
-f32 reflect_mirror(Ray *light_ray, Line *mirror) {
-    f32 alpha = light_ray->angle;
-    f32 beta = Line_Angle(mirror);
-
-    f32 theta_1 = alpha - beta + PI/2;
-    f32 theta_2 = PI - theta_1;
-    return theta_2 + beta - PI/2;
-}
-
-f32 refract_lens(Ray *light_ray, Lens *lens) {
-    f32 alpha = light_ray->angle;
-    f32 beta = Line_Angle(&lens->line);
-
-    Vector2 intersection = ray_line_intersect(light_ray, &lens->line);
-    Vector2 center = Vector2_Average(&lens->line.start, &lens->line.end);
-    Vector2 displacement = Vector2_Subtract(&center, &intersection);
-    Vector2 light_vector = Ray_ToVector(light_ray);
-    f32 x_1 = Vector2_Cross(&displacement, &light_vector);
-
-    f32 theta_1 = alpha - beta + PI/2;
-    f32 theta_2 = -x_1 / lens->focal_length + theta_1;
-    return theta_2 + beta - PI/2;
-}
-
-void test_mirror(Rays *light_rays, Lines *mirrors) {
-    Rays_Push(light_rays, (Ray) {
+void test_mirror(Rays *light_rays, Lines *mirrors, Arena *arena) {
+    *Array_Push(light_rays, arena) = (Ray) {
         .start = { 500, 500 },
         .angle = -1
-    });
+    };
 
-    Lines_Push(mirrors, (Line) {
+    *Array_Push(mirrors, arena) = (Line) {
         .start = { 700, 100 },
         .end = { 800, 100 }
-    });
+    };
 }
 
-void test_lens(Rays *light_rays, Lenses *lenses) {
+void test_lens(Rays *light_rays, Lenses *lenses, Arena *arena) {
     i32 num_rays = 11;
     for (i32 i = 0; i < num_rays; i++) {
-        Rays_Push(light_rays, (Ray) {
+        *Array_Push(light_rays, arena) = (Ray) {
             .start = {
                 200,
                 150 + 50 * i
             },
             .angle = 0.0
-        });
+        };
     }
 
-    Lenses_Push(lenses, (Lens) {
+    *Array_Push(lenses, arena) = (Lens) {
         .focal_length = 300,
         .line = {
             .start = { 500, 100 },
             .end = { 500, 700 },
         }
-    });
+    };
 }
 
-void test_lens_2(Rays *light_rays, Lenses *lenses) {
-    Rays_Push(light_rays, (Ray) {
+void test_lens_2(Rays *light_rays, Lenses *lenses, Arena *arena) {
+    *Array_Push(light_rays, arena) = (Ray) {
         .start = { 200, 200 },
         .angle = 0
-    });
+    };
 
-    Lenses_Push(lenses, (Lens) {
+    *Array_Push(lenses, arena) = (Lens) {
         .focal_length = 300,
         .line = {
             .start = { 500, 100 },
             .end = { 500, 700 },
         }
-    });
+    };
 
-    Lenses_Push(lenses, (Lens) {
+    *Array_Push(lenses, arena) = (Lens) {
         .focal_length = 300,
         .line = {
             .start = { 700, 100 },
             .end = { 700, 700 },
         }
-    });
+    };
 }

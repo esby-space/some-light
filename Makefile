@@ -1,15 +1,21 @@
 CC=clang
 FLAGS=-std=c99 -Wall -Werror
+DEV=-fcolor-diagnostics -fansi-escape-codes -fsantize=address -g
+RELEASE=-O3
 LIBS=$(shell pkg-config --libs --cflags raylib)
 
 all: main
 
 main: main.c
 	mkdir -p build
-	$(CC) main.c $(LIBS) $(FLAGS) -o build/main
+	$(CC) main.c $(LIBS) $(FLAGS) $(DEV) -o build/main
+
+release:
+	mkdir -p build
+	$(CC) main.c $(LIBS) $(FLAGS) $(RELEASE) -o build/main
 
 run:
-	make
+	make main
 	./build/main
 
 clean:
