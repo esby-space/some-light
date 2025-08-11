@@ -1,5 +1,4 @@
-#ifndef LIST
-#define LIST
+#pragma once
 
 #include "arena.c"
 
@@ -23,13 +22,11 @@ static void List_Grow(void *slice, ptrdiff_t size, Arena *arena) {
 
     replica.capacity = replica.capacity ? replica.capacity : 1;
     ptrdiff_t align = 16;
-    void *data = Arena_AllocAlign(arena, 2*size, align, replica.capacity);
+    void *data = Arena_AllocAlign(arena, 2*size, align, replica.capacity, 0);
     replica.capacity *= 2;
 
     if (replica.length) { memcpy(data, replica.data, size*replica.length); }
     replica.data = data;
     memcpy(slice, &replica, sizeof(replica));
 }
-
-#endif
 

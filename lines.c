@@ -1,17 +1,13 @@
-#ifndef LINES
-#define LINES
+#pragma once
 
 #include <float.h>
 #include <math.h>
 #include <signal.h>
 
-#define Ray RAYLIB_Ray
-#include <raylib.h>
-#undef Ray
-
 #include "lib/types.c"
-#include "constants.c"
+#include "lib/raylib.c"
 #include "lib/vectors.c"
+#include "constants.c"
 
 typedef struct {
     Vector2 start;
@@ -35,27 +31,15 @@ typedef struct {
     usize capacity;
 } Lines;
 
-Line Lines_Get(Lines *lines, usize index) {
+Line *Lines_Get(Lines *lines, usize index) {
     if (index < 0 || index >= lines->length) { raise(SIGTRAP); }
-    return lines->data[index]; 
+    return lines->data + index;
 }
 
-Ray Rays_Get(Rays *rays, usize index) {
+Ray *Rays_Get(Rays *rays, usize index) {
     if (index < 0 || index >= rays->length) { raise(SIGTRAP); }
-    return rays->data[index]; 
+    return rays->data + index;
 }
-
-// void Lines_Push(Lines *lines, Line line) {
-//     if (lines->length == lines->capacity) { raise(SIGTRAP); }
-//     lines->data[lines->length] = line;
-//     lines->length++;
-// }
-//
-// void Rays_Push(Rays *rays, Ray ray) {
-//     if (rays->length == rays->capacity) { raise(SIGTRAP); }
-//     rays->data[rays->length] = ray;
-//     rays->length++;
-// }
 
 Vector2 Ray_ToVector(Ray *ray) {
     return (Vector2) { cos(ray->angle), sin(ray->angle) };
@@ -134,8 +118,8 @@ usize closest_intersection(Ray *ray, Lines *lines, Vector2 *intersection, f32 *d
     usize index = (usize) -1;
 
     for (i32 i = 0; i < lines->length; i++) {
-        Line line = Lines_Get(lines, i);
-        Vector2 test_intersection = ray_line_intersect(ray, &line);
+        Line *line = Lines_Get(lines, i);
+        Vector2 test_intersection = ray_line_intersect(ray, line);
         if (isnan(test_intersection.x) || isnan(test_intersection.y)) continue;
 
         f32 test_distance = Vector2_Distance(&ray->start, &test_intersection);
@@ -148,6 +132,4 @@ usize closest_intersection(Ray *ray, Lines *lines, Vector2 *intersection, f32 *d
 
     return index;
 }
-
-#endif
 

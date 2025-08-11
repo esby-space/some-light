@@ -1,9 +1,8 @@
-#ifndef VECTORS
-#define VECTORS
+#pragma once
 
-#include <raylib.h>
 #include <math.h>
 
+#include "raylib.c"
 #include "types.c"
 
 f32 Vector2_Length(Vector2 *v) {
@@ -44,4 +43,3 @@ f32 Vector2_Cross(Vector2 *a, Vector2 *b) {
     return a->x * b->y - a->y * b->x;
 }
 
-#endif

@@ -1,5 +1,4 @@
-#ifndef OPTICS
-#define OPTICS
+#pragma once
 
 #include "lib/types.c"
 #include "lines.c"
@@ -15,16 +14,10 @@ typedef struct {
     usize capacity;
 } Lenses;
 
-Lens Lenses_Get(Lenses *lenses, usize index) {
+Lens *Lenses_Get(Lenses *lenses, usize index) {
     if (index < 0 || index >= lenses->length) { raise(SIGTRAP); }
-    return lenses->data[index]; 
+    return lenses->data + index;
 }
-
-// void Lenses_Push(Lenses *lenses, Lens lens) {
-//     if (lenses->length == lenses->capacity) { raise(SIGTRAP); }
-//     lenses->data[lenses->length] = lens;
-//     lenses->length++;
-// }
 
 usize closest_lens(Ray *ray, Lenses *lenses, Vector2 *intersection, f32 *distance) {
     *intersection = (Vector2) { NAN, NAN };
@@ -32,8 +25,8 @@ usize closest_lens(Ray *ray, Lenses *lenses, Vector2 *intersection, f32 *distanc
     usize index = (usize) -1;
 
     for (i32 i = 0; i < lenses->length; i++) {
-        Lens lens = Lenses_Get(lenses, i);
-        Vector2 test_intersection = ray_line_intersect(ray, &lens.line);
+        Lens *lens = Lenses_Get(lenses, i);
+        Vector2 test_intersection = ray_line_intersect(ray, &lens->line);
         if (isnan(test_intersection.x) || isnan(test_intersection.y)) continue;
 
         f32 test_distance = Vector2_Distance(&ray->start, &test_intersection);
@@ -71,6 +64,4 @@ f32 refract_lens(Ray *light_ray, Lens *lens) {
     f32 theta_2 = -x_1 / lens->focal_length + theta_1;
     return theta_2 + beta - PI/2;
 }
-
-#endif
 

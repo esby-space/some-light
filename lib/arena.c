@@ -1,8 +1,9 @@
-#ifndef ARENA
-#define ARENA
+#pragma once
 
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdalign.h>
 #include "types.c"
 
 // https://nullprogram.com/blog/2023/09/27/
@@ -30,10 +31,10 @@ Arena Arena_New(usize capacity) {
 #define Arena_Alloc3(a, t, n)       (t *)Arena_AllocAlign(a, sizeof(t), alignof(t), n, 0)
 #define Arena_Alloc4(a, t, n, f)    (t *)Arena_AllocAlign(a, sizeof(t), alignof(t), n, f)
 
-void *Arena_AllocAlign(Arena *arena, usize size, usize align, u32 count) {
+void *Arena_AllocAlign(Arena *arena, usize size, usize align, u32 count, u8 flags) {
     ptrdiff_t padding = -(uptr) arena->start & (align - 1);
     ptrdiff_t available = arena->end - arena->start - padding;
-    if (available < 0 || count > available / size) { abort(); }
+    if (available < 0 || count > available / size) { raise(SIGTRAP); }
 
     void *p = arena->start + padding;
     arena->start += padding + count * size;
@@ -48,6 +49,4 @@ void Arena_Free(Arena *arena) {
 void Arena_Reset(Arena *arena) {
     arena->start = arena->base;
 }
-
-#endif
 

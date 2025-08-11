@@ -1,5 +1,4 @@
-#ifndef TYPES
-#define TYPES
+#pragma once
 
 #include <stddef.h>
 #include <stdint.h>
@@ -21,6 +20,4 @@ typedef intptr_t  iptr;
 
 typedef size_t    usize;
 typedef size_t    isize;
-
-#endif
 

@@ -1,5 +1,4 @@
-#ifndef CONSTANTS
-#define CONSTANTS
+#pragma once
 
 #include "lib/types.c"
 
@@ -16,5 +15,3 @@ const u32 LIGHT_RAY_LENGTH = 4096;
 const u32 POINT_SOURCE_RAY_NUMBER = 32;
 const u32 LINE_SOURCE_RAY_DISTANCE = 32;
 
-
-#endif
